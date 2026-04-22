@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+
+{% block title %}Tournament Dashboard - {{ site_name }}{% endblock %}
+
+{% block hero %}
+<section class="sr-hero">
+    <div class="container hero-grid">
+        <div>
+            <p class="sr-kicker">Tournament dashboard</p>
+            <h1 class="display-5">Create a tournament and start entering scores.</h1>
+            <p class="lead">4 Swiss rounds with an obvious finals cut. All your tournaments are saved in the history.</p>
+        </div>
+        <div class="sr-hero-card">
+            <div>
+                <h2>{{ site_name }}</h2>
+                <p>4 rounds max per event</p>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block content %}
+    <div class="create-tournament-container">
+        <section class="sr-card form-panel">
+            <h2>New tournament</h2>
+            <form method="post" action="{{ url_for('create_tournament_route') }}" class="d-grid gap-3">
+                <label>
+                    <span class="sr-label">Tournament name</span>
+                    <input type="text" name="tournament_name" class="form-control" placeholder="Friday Night Commander" value="{{ tournament_name or '' }}">
+                </label>
+
+                <label>
+                    <span class="sr-label">Number of players</span>
+                    <input type="number" name="player_count" class="form-control" min="2" max="64" value="{{ player_count }}">
+                </label>
+
+                <label>
+                    <span class="sr-label">Player names</span>
+                    <textarea name="player_names" class="form-control" rows="10" placeholder="Enter one name per line">{{ player_names_text or '' }}</textarea>
+                    <small class="text-muted mt-1 d-block">One name per line. Format: 4 Swiss rounds, finals cut displayed after round 4.</small>
+                </label>
+
+                <button type="submit" class="sr-cta btn btn-lg">Create tournament</button>
+            </form>
+        </section>
+    </div>
+{% endblock %}

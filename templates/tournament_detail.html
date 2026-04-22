@@ -1,0 +1,172 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ tournament.name }} - {{ site_name }}{% endblock %}
+
+{% block hero %}
+<section class="sr-hero">
+    <div class="container hero-grid">
+        <div>
+            <p class="sr-kicker">Tournament detail</p>
+            <h1 class="display-5">{{ tournament.name }}</h1>
+            <p class="lead">Work through the current round on its own page, then review the finals cut after round 4.</p>
+        </div>
+        <div class="sr-hero-card">
+            <div>
+                <h2>{{ tournament.player_count }} players</h2>
+                <p>{{ tournament.completed_rounds }}/4 rounds complete</p>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+            <a href="{{ url_for('index') }}" class="button button-ghost">Back to dashboard</a>
+            <span class="status-pill {% if tournament.status == 'complete' %}status-complete{% endif %}">{{ tournament.status }}</span>
+        </div>
+    </div>
+
+    {% if tournament.status == 'complete' and tournament.champion_name %}
+        <div class="col-12">
+            <section class="winner-banner">
+                <div class="winner-content">
+                    <p class="winner-kicker">Tournament champion</p>
+                    <h2 class="winner-name">{{ tournament.champion_name }}</h2>
+                    <p class="winner-stats">{{ tournament.standings[0].wins }} wins • {{ tournament.standings[0].points }} points</p>
+                </div>
+            </section>
+        </div>
+    {% endif %}
+
+    <div class="col-12">
+        <section class="sr-card">
+            <div class="section-header mb-3">
+                <div>
+                    <h2 class="mb-1">Standings</h2>
+                    <p class="text-muted mb-0">Ranked by wins, opponent strength, then points.</p>
+                </div>
+            </div>
+            <div class="standings-table-wrap">
+                <table class="table standings-table">
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>Player</th>
+                            <th>Wins</th>
+                            <th>Points</th>
+                            <th>Opp MW%</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in tournament.standings %}
+                            <tr>
+                                <td>{{ row.rank }}</td>
+                                <td>{{ row.name }}</td>
+                                <td>{{ row.wins }}</td>
+                                <td>{{ row.points }}</td>
+                                <td>{{ '%.3f'|format(row.opponent_match_win_pct) }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+
+    {% for round in tournament.rounds %}
+        <div class="col-12">
+            <section class="sr-card round-section">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <h2 class="mb-0">Round {{ round.round_number }}</h2>
+                    <span class="status-pill {% if round.complete %}status-complete{% endif %}">{% if round.complete %}Complete{% else %}In progress{% endif %}</span>
+                </div>
+
+                {% if current_round == round.round_number and not round.complete %}
+                    <form method="post" class="d-grid gap-3 mt-3">
+                        <input type="hidden" name="action" value="save_round">
+                        <input type="hidden" name="round_number" value="{{ round.round_number }}">
+
+                        <div class="bracket-grid">
+                            {% for pod in round.pods %}
+                                <article class="bracket-match pod-card {% if pod.is_finals %}finals-pod{% endif %}">
+                                    <div class="match-head">{% if pod.is_finals %}FINALS{% else %}Pod {{ pod.pod_number }}{% endif %}</div>
+                                    {% for player in pod.players %}
+                                        <label class="pod-line">
+                                            <span>{{ player.name }}</span>
+                                            {% if player.name == 'BYE' %}
+                                                <input type="number" class="form-control" disabled value="0">
+                                            {% else %}
+                                                <input
+                                                    type="number"
+                                                    name="{{ player.field_name }}"
+                                                    class="form-control"
+                                                    min="0"
+                                                    step="1"
+                                                    value="{{ player.raw_score }}"
+                                                    placeholder="Score"
+                                                >
+                                            {% endif %}
+                                        </label>
+                                    {% endfor %}
+                                    <div class="match-foot {% if pod.tie %}warning-text{% endif %}">{{ pod.result_text }}</div>
+                                </article>
+                            {% endfor %}
+                        </div>
+
+                        <button type="submit" class="sr-cta btn btn-lg">Save round scores</button>
+                    </form>
+                {% else %}
+                    <div class="bracket-grid mt-3">
+                        {% for pod in round.pods %}
+                            <article class="bracket-match pod-card {% if pod.is_finals %}finals-pod{% endif %}">
+                                <div class="match-head">{% if pod.is_finals %}FINALS{% else %}Pod {{ pod.pod_number }}{% endif %}</div>
+                                {% for player in pod.players %}
+                                    <div class="match-row">
+                                        <span>{{ player.name }}</span>
+                                        <strong>{% if player.raw_score != '' %}{{ player.raw_score }}{% else %}-{% endif %}</strong>
+                                    </div>
+                                {% endfor %}
+                                <div class="match-foot {% if pod.tie %}warning-text{% endif %}">{{ pod.result_text }}</div>
+                            </article>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </section>
+        </div>
+    {% endfor %}
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+<script>
+{% if tournament.status == 'complete' %}
+    document.addEventListener('DOMContentLoaded', function() {
+        // Trigger confetti after a brief delay for visual effect
+        setTimeout(function() {
+            confetti({
+                particleCount: 100,
+                spread: 70,
+                origin: { y: 0.6 }
+            });
+            // Second burst
+            setTimeout(function() {
+                confetti({
+                    particleCount: 50,
+                    angle: 60,
+                    spread: 55,
+                    origin: { x: 0, y: 0.6 }
+                });
+                confetti({
+                    particleCount: 50,
+                    angle: 120,
+                    spread: 55,
+                    origin: { x: 1, y: 0.6 }
+                });
+            }, 250);
+        }, 400);
+    });
+{% endif %}
+</script>
+{% endblock %}

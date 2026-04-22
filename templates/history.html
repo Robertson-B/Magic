@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+
+{% block title %}Tournament History - {{ site_name }}{% endblock %}
+
+{% block hero %}
+<section class="sr-hero">
+    <div class="container hero-grid">
+        <div>
+            <p class="sr-kicker">Tournament history</p>
+            <h1 class="display-5">All tournaments in one place.</h1>
+            <p class="lead">Return to in-progress tournaments to continue entering scores, or review completed events.</p>
+        </div>
+        <div class="sr-hero-card">
+            <div>
+                <h2>{{ total_tournaments }} total</h2>
+                <p>Tournament history</p>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block content %}
+    <div class="row g-4">
+        {% if active_tournaments %}
+        <div class="col-12">
+            <section class="sr-card bracket-panel">
+                <div class="mb-3">
+                    <h2 class="mb-1">In progress tournaments</h2>
+                    <p class="text-muted mb-0">Open one to continue entering scores.</p>
+                </div>
+
+                <div class="dashboard-grid">
+                    {% for tournament in active_tournaments %}
+                        <article class="tournament-card">
+                            <div class="d-flex justify-content-between align-items-start gap-3">
+                                <div>
+                                    <p class="sr-kicker mb-2">{{ tournament.status }}</p>
+                                    <h3 class="mb-1">{{ tournament.name }}</h3>
+                                    <p class="text-muted mb-0">{{ tournament.player_count }} players</p>
+                                </div>
+                                <span class="status-pill">{{ tournament.completed_rounds }}/4</span>
+                            </div>
+                            <div class="mt-3 d-flex justify-content-between align-items-center gap-3 flex-wrap">
+                                <p class="mb-0">{{ tournament.completed_rounds }} rounds completed</p>
+                                <a class="sr-cta btn" href="{{ url_for('tournament_detail', tournament_id=tournament.id) }}">Open tournament</a>
+                            </div>
+                        </article>
+                    {% endfor %}
+                </div>
+            </section>
+        </div>
+        {% endif %}
+
+        {% if completed_tournaments %}
+        <div class="col-12">
+            <section class="sr-card bracket-panel">
+                <div class="mb-3">
+                    <h2 class="mb-1">Completed tournaments</h2>
+                    <p class="text-muted mb-0">Final results and winner.</p>
+                </div>
+
+                <div class="dashboard-grid">
+                    {% for tournament in completed_tournaments %}
+                        <article class="tournament-card">
+                            <div class="d-flex justify-content-between align-items-start gap-3">
+                                <div>
+                                    <p class="sr-kicker mb-2">{{ tournament.status }}</p>
+                                    <h3 class="mb-1">{{ tournament.name }}</h3>
+                                    <p class="text-muted mb-0">{{ tournament.player_count }} players</p>
+                                </div>
+                                <span class="status-pill status-complete">4/4</span>
+                            </div>
+                            <div class="mt-3 d-flex justify-content-between align-items-center gap-3 flex-wrap">
+                                <p class="mb-0">{% if tournament.champion_name %}Champion: <strong>{{ tournament.champion_name }}</strong>{% else %}Top 4 finalists from standings{% endif %}</p>
+                                <a class="sr-cta btn" href="{{ url_for('tournament_detail', tournament_id=tournament.id) }}">View results</a>
+                            </div>
+                        </article>
+                    {% endfor %}
+                </div>
+            </section>
+        </div>
+        {% endif %}
+
+        {% if not active_tournaments and not completed_tournaments %}
+        <div class="col-12">
+            <section class="sr-card">
+                <div class="empty-preview">
+                    <h3>No tournaments yet</h3>
+                    <p><a href="/">Create one on the home page</a> to start entering Swiss rounds.</p>
+                </div>
+            </section>
+        </div>
+        {% endif %}
+    </div>
+{% endblock %}

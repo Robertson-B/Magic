@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+
+{% block title %}Commander Guide - {{ site_name }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <section class="mb-4">
+            <h1>How the commander pod creator works</h1>
+            <p class="lead">Use the home page to enter a tournament name, choose the player count, and paste player names one per line. The app builds four-player pods across 4 rounds and makes the finals cut obvious from the standings.</p>
+        </section>
+
+        <section class="mb-3 sr-card">
+            <h3>Pod creation</h3>
+            <p>The player count controls the number of seats. Every pod is four players wide, and any empty seats are filled with BYEs automatically.</p>
+        </section>
+
+        <section class="mb-3 sr-card">
+            <h3>Scoring</h3>
+            <p>After generating pods, enter a score for each player and calculate advancement. The highest score in each pod moves on to the next round preview.</p>
+        </section>
+
+        <section class="mb-3 sr-card">
+            <h3>Next useful additions</h3>
+            <ul>
+                <li>Persist saved pods and scores in SQLite.</li>
+                <li>Add tie-breaking rules for tied scores.</li>
+                <li>Support multiple scoring rounds automatically.</li>
+            </ul>
+        </section>
+
+        <div class="text-center mt-4">
+            <a href="/" class="sr-cta btn">Back to bracket creator</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
