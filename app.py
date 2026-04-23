@@ -18,6 +18,16 @@ def inject_site_name():
     return {"site_name": "MTG Bracket Forge"}
 
 
+@app.after_request
+def add_no_store_headers(response):
+    content_type = response.headers.get("Content-Type", "")
+    if content_type.startswith("text/html"):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
+
+
 @app.route('/manifest.webmanifest')
 def manifest():
     manifest_data = {
@@ -79,9 +89,11 @@ self.addEventListener('fetch', event => {
     }
 
     const request = event.request;
+    const url = new URL(request.url);
+    const isTournamentPage = url.pathname.startsWith('/tournaments/');
     const isPageRequest = request.mode === 'navigate' || request.headers.get('accept')?.includes('text/html');
 
-    if (isPageRequest) {
+    if (isPageRequest && !isTournamentPage) {
         event.respondWith(
             fetch(request)
                 .then(networkResponse => {
@@ -90,6 +102,13 @@ self.addEventListener('fetch', event => {
                     return networkResponse;
                 })
                 .catch(() => caches.match(request).then(cached => cached || caches.match('/offline')))
+        );
+        return;
+    }
+
+    if (isPageRequest && isTournamentPage) {
+        event.respondWith(
+            fetch(request).catch(() => caches.match('/offline'))
         );
         return;
     }
@@ -133,6 +152,7 @@ def ensure_column_exists(table_name, column_name, column_sql):
         columns = {row["name"] for row in conn.execute(f"PRAGMA table_info({table_name})").fetchall()}
         if column_name not in columns:
             conn.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_sql}")
+            conn.commit()
 
 
 def initialize_database():
@@ -237,6 +257,7 @@ def save_tournament(tournament):
                 tournament["id"],
             ),
         )
+        conn.commit()
 
 
 def load_tournament(tournament_id):
@@ -757,6 +778,8 @@ def tournament_detail(tournament_id):
     tournament = load_tournament(tournament_id)
     current_view = compute_tournament_view(tournament)
     validation_errors = []
+    failed_round = None
+    submitted_round_scores = None
 
     if request.method == 'POST':
         action = request.form.get('action', 'save_round')
@@ -771,6 +794,9 @@ def tournament_detail(tournament_id):
                     previous_round_scores = tournament['round_scores'].get(round_number, {})
                     tournament['round_scores'][round_number] = round_scores
                     append_edit_history(tournament, round_number, previous_round_scores, round_scores)
+                else:
+                    failed_round = target_round
+                    submitted_round_scores = round_scores
             else:
                 validation_errors = ["Could not find that round to save. Refresh and try again."]
 
@@ -778,14 +804,10 @@ def tournament_detail(tournament_id):
             tournament = enrich_tournament(tournament, persist=False)
             current_round = tournament['current_round']
             active_round = tournament['rounds'][current_round - 1] if current_round <= len(tournament['rounds']) else None
-            if action == 'save_round':
-                failed_round_number = int(request.form.get('round_number', '1'))
-                failed_round = tournament['rounds'][failed_round_number - 1] if failed_round_number <= len(tournament['rounds']) else None
-                if failed_round and target_round:
-                    submitted_round_scores = build_round_score_map(request.form, failed_round_number, target_round['pods'])
-                    apply_submitted_scores_to_round(failed_round, submitted_round_scores)
-                    current_round = failed_round_number
-                    active_round = failed_round
+            if action == 'save_round' and failed_round and submitted_round_scores:
+                apply_submitted_scores_to_round(failed_round, submitted_round_scores)
+                current_round = int(request.form.get('round_number', '1'))
+                active_round = failed_round
             round_summary = build_round_summary(active_round)
             return render_template(
                 'tournament_detail.html',
