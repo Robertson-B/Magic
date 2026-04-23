@@ -1,4 +1,7 @@
+import csv
+from datetime import datetime, timezone
 import json
+import io
 import os
 from random import shuffle
 import sqlite3
@@ -16,37 +19,38 @@ def inject_site_name():
 
 @app.route('/manifest.webmanifest')
 def manifest():
-        manifest_data = {
-                "name": "MTG Bracket Forge",
-                "short_name": "Bracket Forge",
-                "start_url": "/",
-                "scope": "/",
-                "display": "standalone",
-                "background_color": "#f5efe7",
-                "theme_color": "#8c3f2c",
-                "description": "Commander tournament brackets, standings, and finals tracking.",
-                "icons": [
-                        {
-                                "src": "/static/icons/icon.svg",
-                                "sizes": "any",
-                                "type": "image/svg+xml",
-                                "purpose": "any maskable",
-                        }
-                ],
-        }
-        response = make_response(json.dumps(manifest_data))
-        response.headers["Content-Type"] = "application/manifest+json"
-        return response
+    manifest_data = {
+        "name": "MTG Bracket Forge",
+        "short_name": "Bracket Forge",
+        "start_url": "/",
+        "scope": "/",
+        "display": "standalone",
+        "background_color": "#f5efe7",
+        "theme_color": "#8c3f2c",
+        "description": "Commander tournament brackets, standings, and finals tracking.",
+        "icons": [
+            {
+                "src": "/static/icons/icon.svg",
+                "sizes": "any",
+                "type": "image/svg+xml",
+                "purpose": "any maskable",
+            }
+        ],
+    }
+    response = make_response(json.dumps(manifest_data))
+    response.headers["Content-Type"] = "application/manifest+json"
+    return response
 
 
 @app.route('/sw.js')
 def service_worker():
         service_worker_js = """
-const CACHE_NAME = 'mtg-bracket-forge-v1';
+const CACHE_NAME = 'mtg-bracket-forge-v2';
 const CORE_ASSETS = [
     '/',
     '/about',
     '/tournaments/history',
+    '/offline',
     '/manifest.webmanifest',
     '/static/css/silkroad.css',
     '/static/icons/icon.svg'
@@ -73,17 +77,35 @@ self.addEventListener('fetch', event => {
         return;
     }
 
-    event.respondWith(
-        caches.match(event.request).then(cachedResponse => {
-            if (cachedResponse) {
-                return cachedResponse;
-            }
+    const request = event.request;
+    const isPageRequest = request.mode === 'navigate' || request.headers.get('accept')?.includes('text/html');
 
-            return fetch(event.request).then(networkResponse => {
-                const responseClone = networkResponse.clone();
-                caches.open(CACHE_NAME).then(cache => cache.put(event.request, responseClone));
-                return networkResponse;
-            }).catch(() => caches.match('/'));
+    if (isPageRequest) {
+        event.respondWith(
+            fetch(request)
+                .then(networkResponse => {
+                    const clone = networkResponse.clone();
+                    caches.open(CACHE_NAME).then(cache => cache.put(request, clone));
+                    return networkResponse;
+                })
+                .catch(() => caches.match(request).then(cached => cached || caches.match('/offline')))
+        );
+        return;
+    }
+
+    event.respondWith(
+        caches.match(request).then(cachedResponse => {
+            const networkFetch = fetch(request)
+                .then(networkResponse => {
+                    if (networkResponse && networkResponse.status === 200) {
+                        const clone = networkResponse.clone();
+                        caches.open(CACHE_NAME).then(cache => cache.put(request, clone));
+                    }
+                    return networkResponse;
+                })
+                .catch(() => cachedResponse);
+
+            return cachedResponse || networkFetch;
         })
     );
 });
@@ -94,10 +116,22 @@ self.addEventListener('fetch', event => {
         return response
 
 
+@app.route('/offline')
+def offline_page():
+        return render_template('offline.html')
+
+
 def get_db_connection():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+def ensure_column_exists(table_name, column_name, column_sql):
+    with get_db_connection() as conn:
+        columns = {row["name"] for row in conn.execute(f"PRAGMA table_info({table_name})").fetchall()}
+        if column_name not in columns:
+            conn.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_sql}")
 
 
 def initialize_database():
@@ -119,6 +153,8 @@ def initialize_database():
             )
             """
         )
+
+    ensure_column_exists("tournaments", "edit_history_json", "TEXT NOT NULL DEFAULT '[]'")
 
 
 initialize_database()
@@ -144,6 +180,7 @@ def serialize_tournament(tournament):
         "player_names_json": json.dumps(tournament["player_names"]),
         "pairing_order_json": json.dumps(tournament["pairing_order"]),
         "round_scores_json": json.dumps(tournament["round_scores"]),
+        "edit_history_json": json.dumps(tournament.get("edit_history", [])),
         "status": tournament["status"],
         "champion_name": tournament["champion_name"],
     }
@@ -153,6 +190,10 @@ def deserialize_tournament(row):
     if row is None:
         return None
 
+    edit_history = []
+    if "edit_history_json" in row.keys() and row["edit_history_json"]:
+        edit_history = json.loads(row["edit_history_json"])
+
     return {
         "id": row["id"],
         "name": row["name"],
@@ -160,6 +201,7 @@ def deserialize_tournament(row):
         "player_names": json.loads(row["player_names_json"]),
         "pairing_order": json.loads(row["pairing_order_json"]),
         "round_scores": normalize_round_scores(json.loads(row["round_scores_json"])),
+        "edit_history": edit_history,
         "status": row["status"],
         "champion_name": row["champion_name"],
     }
@@ -176,6 +218,7 @@ def save_tournament(tournament):
                 player_names_json = ?,
                 pairing_order_json = ?,
                 round_scores_json = ?,
+                edit_history_json = ?,
                 status = ?,
                 champion_name = ?,
                 updated_at = datetime('now')
@@ -187,6 +230,7 @@ def save_tournament(tournament):
                 payload["player_names_json"],
                 payload["pairing_order_json"],
                 payload["round_scores_json"],
+                payload["edit_history_json"],
                 payload["status"],
                 payload["champion_name"],
                 tournament["id"],
@@ -237,9 +281,10 @@ def create_tournament(name, player_count, player_names):
                 pairing_order_json,
                 round_scores_json,
                 finals_scores_json,
+                edit_history_json,
                 status,
                 champion_name
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 name or "Untitled Tournament",
@@ -248,6 +293,7 @@ def create_tournament(name, player_count, player_names):
                 json.dumps(pairing_order),
                 json.dumps({}),
                 json.dumps({}),
+                json.dumps([]),
                 "in progress",
                 None,
             ),
@@ -372,6 +418,110 @@ def parse_score(form_data, field_name):
         return raw_score, int(raw_score)
     except ValueError:
         return raw_score, None
+
+
+def validate_round_placements(pods, round_scores):
+    errors = []
+
+    for pod in pods:
+        pod_number = pod["pod_number"]
+        pod_entries = round_scores.get(pod_number, {})
+        entered_places = []
+        participant_count = 0
+
+        for player in pod["players"]:
+            if player["name"] == "BYE":
+                continue
+            participant_count += 1
+            score_entry = pod_entries.get(player["slot_number"], {})
+            place_value = score_entry.get("score")
+            if place_value is None:
+                continue
+            entered_places.append(place_value)
+
+        if len(entered_places) != participant_count:
+            errors.append(f"Pod {pod_number}: enter a placement for every player.")
+            continue
+
+        expected_places = list(range(1, participant_count + 1))
+        if sorted(entered_places) != expected_places:
+            expected_text = ", ".join(str(value) for value in expected_places)
+            errors.append(f"Pod {pod_number}: placements must be unique and exactly {expected_text}.")
+
+    return errors
+
+
+def append_edit_history(tournament, round_number, old_round_scores, new_round_scores):
+    history = tournament.setdefault("edit_history", [])
+    history.append(
+        {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "round_number": round_number,
+            "old_scores": old_round_scores,
+            "new_scores": new_round_scores,
+        }
+    )
+
+    # Keep only the newest 200 edits so payload size stays manageable.
+    if len(history) > 200:
+        tournament["edit_history"] = history[-200:]
+
+
+def build_round_summary(round_data):
+    if not round_data:
+        return []
+
+    summary_rows = []
+    for pod in round_data["pods"]:
+        participants = [player["name"] for player in pod["players"] if player["name"] != "BYE"]
+        summary_rows.append(
+            {
+                "pod_number": pod["pod_number"],
+                "is_finals": pod.get("is_finals", False),
+                "players": participants,
+            }
+        )
+    return summary_rows
+
+
+def export_tournament_csv_data(tournament):
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    writer.writerow(["Tournament", tournament["name"]])
+    writer.writerow(["Status", tournament["status"]])
+    writer.writerow(["Champion", tournament.get("champion_name") or ""])
+    writer.writerow([])
+
+    writer.writerow(["Final Standings"])
+    writer.writerow(["Rank", "Player", "Wins", "Points", "Opponent MW%", "Finalist"])
+    for row in tournament["standings"]:
+        writer.writerow(
+            [
+                row["rank"],
+                row["name"],
+                row["wins"],
+                row["points"],
+                f"{row['opponent_match_win_pct']:.3f}",
+                "Yes" if row["name"] in tournament.get("finalists", []) else "No",
+            ]
+        )
+
+    writer.writerow([])
+    writer.writerow(["Round Results"])
+    writer.writerow(["Round", "Pod", "Label", "Result"])
+    for round_data in tournament["rounds"]:
+        for pod in round_data["pods"]:
+            writer.writerow(
+                [
+                    round_data["round_number"],
+                    pod["pod_number"],
+                    "FINALS" if pod.get("is_finals") else f"Pod {pod['pod_number']}",
+                    pod.get("result_text", ""),
+                ]
+            )
+
+    return output.getvalue()
 
 
 def evaluate_round(round_number, pods, score_map, stats, apply_results):
@@ -564,6 +714,7 @@ def create_tournament_route():
 def tournament_detail(tournament_id):
     tournament = load_tournament(tournament_id)
     current_view = compute_tournament_view(tournament)
+    validation_errors = []
 
     if request.method == 'POST':
         action = request.form.get('action', 'save_round')
@@ -573,7 +724,25 @@ def tournament_detail(tournament_id):
             target_round = current_view['rounds'][round_number - 1] if round_number <= len(current_view['rounds']) else None
             if target_round:
                 round_scores = build_round_score_map(request.form, round_number, target_round['pods'])
-                tournament['round_scores'][round_number] = round_scores
+                validation_errors = validate_round_placements(target_round['pods'], round_scores)
+                if not validation_errors:
+                    previous_round_scores = tournament['round_scores'].get(round_number, {})
+                    tournament['round_scores'][round_number] = round_scores
+                    append_edit_history(tournament, round_number, previous_round_scores, round_scores)
+
+        if validation_errors:
+            tournament = enrich_tournament(tournament, persist=False)
+            current_round = tournament['current_round']
+            active_round = tournament['rounds'][current_round - 1] if current_round <= len(tournament['rounds']) else None
+            round_summary = build_round_summary(active_round)
+            return render_template(
+                'tournament_detail.html',
+                tournament=tournament,
+                current_round=current_round,
+                active_round=active_round,
+                validation_errors=validation_errors,
+                round_summary=round_summary,
+            )
 
         enrich_tournament(tournament)
         return redirect(url_for('tournament_detail', tournament_id=tournament_id))
@@ -581,13 +750,31 @@ def tournament_detail(tournament_id):
     tournament = enrich_tournament(tournament)
     current_round = tournament['current_round']
     active_round = tournament['rounds'][current_round - 1] if current_round <= len(tournament['rounds']) else None
+    round_summary = build_round_summary(active_round)
 
     return render_template(
         'tournament_detail.html',
         tournament=tournament,
         current_round=current_round,
         active_round=active_round,
+        validation_errors=validation_errors,
+        round_summary=round_summary,
     )
+
+
+@app.route('/tournaments/<int:tournament_id>/export.csv')
+def export_tournament(tournament_id):
+    tournament = enrich_tournament(load_tournament(tournament_id), persist=False)
+    csv_content = export_tournament_csv_data(tournament)
+
+    safe_name = "".join(ch if ch.isalnum() or ch in ("-", "_") else "_" for ch in tournament["name"]).strip("_")
+    if not safe_name:
+        safe_name = f"tournament_{tournament_id}"
+
+    response = make_response(csv_content)
+    response.headers["Content-Type"] = "text/csv; charset=utf-8"
+    response.headers["Content-Disposition"] = f"attachment; filename={safe_name}_results.csv"
+    return response
 
 
 @app.route('/tournaments/history')
@@ -606,6 +793,11 @@ def history():
 @app.route('/about')
 def about():
     return render_template('about.html')
+
+
+@app.errorhandler(404)
+def not_found(error):
+    return render_template('404.html'), 404
 
 
 if __name__ == "__main__":

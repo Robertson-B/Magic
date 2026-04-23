@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+
+{% block title %}Offline - {{ site_name }}{% endblock %}
+
+{% block hero %}
+<section class="sr-hero">
+    <div class="container hero-grid">
+        <div>
+            <p class="sr-kicker">Offline mode</p>
+            <h1 class="display-5">You are currently offline.</h1>
+            <p class="lead">Previously viewed pages are available, but live updates and score saves require an internet connection.</p>
+        </div>
+        <div class="sr-hero-card">
+            <div>
+                <h2>Connection lost</h2>
+                <p>Reconnect and refresh when ready.</p>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block content %}
+<section class="sr-card">
+    <h2 class="mb-3">What you can do now</h2>
+    <ul class="info-list">
+        <li>Review cached tournament pages you already opened.</li>
+        <li>Keep placements ready, then submit when back online.</li>
+        <li>Return to <a href="{{ url_for('index') }}">dashboard</a> after reconnecting.</li>
+    </ul>
+</section>
+{% endblock %}

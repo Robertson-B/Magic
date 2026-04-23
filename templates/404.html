@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+
+{% block title %}Page Not Found - {{ site_name }}{% endblock %}
+
+{% block hero %}
+<section class="sr-hero">
+    <div class="container hero-grid">
+        <div>
+            <p class="sr-kicker">404</p>
+            <h1 class="display-5">That page phased out.</h1>
+            <p class="lead">Even the blue player could not counter this missing route.</p>
+        </div>
+        <div class="sr-hero-card">
+            <div>
+                <h2>Nothing here</h2>
+                <p>Try the dashboard and cast a better search spell.</p>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block content %}
+<section class="sr-card text-center">
+    <h2 class="mb-3">You found a wild 404</h2>
+    <p class="mb-4">No worries. Your tournaments are safe, this URL just missed the pod cut.</p>
+    <a href="{{ url_for('index') }}" class="sr-cta btn">Back to dashboard</a>
+</section>
+{% endblock %}

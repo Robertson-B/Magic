@@ -13,6 +13,10 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/silkroad.css') }}">
 </head>
 <body>
+    <div id="offline-banner" class="offline-banner" hidden>
+        You are offline. Changes may not sync until your connection returns.
+    </div>
+
     <nav class="sr-navbar">
         <div class="container d-flex align-items-center justify-content-between">
             <a class="sr-brand" href="/">{{ site_name }}</a>
@@ -38,6 +42,20 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        (function() {
+            const banner = document.getElementById('offline-banner');
+            function syncOnlineStatus() {
+                if (!banner) {
+                    return;
+                }
+                banner.hidden = navigator.onLine;
+            }
+
+            window.addEventListener('online', syncOnlineStatus);
+            window.addEventListener('offline', syncOnlineStatus);
+            syncOnlineStatus();
+        })();
+
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', function() {
                 navigator.serviceWorker.register('{{ url_for('service_worker') }}');
