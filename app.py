@@ -57,13 +57,6 @@ def normalize_round_scores(raw_scores):
     return normalized
 
 
-def normalize_finals_scores(raw_scores):
-    normalized = {}
-    for slot_number, score_entry in (raw_scores or {}).items():
-        normalized[int(slot_number)] = score_entry
-    return normalized
-
-
 def serialize_tournament(tournament):
     return {
         "name": tournament["name"],
@@ -71,7 +64,6 @@ def serialize_tournament(tournament):
         "player_names_json": json.dumps(tournament["player_names"]),
         "pairing_order_json": json.dumps(tournament["pairing_order"]),
         "round_scores_json": json.dumps(tournament["round_scores"]),
-        "finals_scores_json": json.dumps(tournament["finals_scores"]),
         "status": tournament["status"],
         "champion_name": tournament["champion_name"],
     }
@@ -88,7 +80,6 @@ def deserialize_tournament(row):
         "player_names": json.loads(row["player_names_json"]),
         "pairing_order": json.loads(row["pairing_order_json"]),
         "round_scores": normalize_round_scores(json.loads(row["round_scores_json"])),
-        "finals_scores": normalize_finals_scores(json.loads(row["finals_scores_json"])),
         "status": row["status"],
         "champion_name": row["champion_name"],
     }
@@ -105,7 +96,6 @@ def save_tournament(tournament):
                 player_names_json = ?,
                 pairing_order_json = ?,
                 round_scores_json = ?,
-                finals_scores_json = ?,
                 status = ?,
                 champion_name = ?,
                 updated_at = datetime('now')
@@ -117,7 +107,6 @@ def save_tournament(tournament):
                 payload["player_names_json"],
                 payload["pairing_order_json"],
                 payload["round_scores_json"],
-                payload["finals_scores_json"],
                 payload["status"],
                 payload["champion_name"],
                 tournament["id"],
@@ -132,18 +121,6 @@ def load_tournament(tournament_id):
     if not tournament:
         abort(404)
     return tournament
-
-
-def list_active_tournaments():
-    with get_db_connection() as conn:
-        rows = conn.execute(
-            "SELECT * FROM tournaments WHERE status != 'complete' ORDER BY id DESC"
-        ).fetchall()
-    tournaments = []
-    for row in rows:
-        tournament = deserialize_tournament(row)
-        tournaments.append(enrich_tournament(tournament, persist=False))
-    return tournaments
 
 
 def list_all_tournaments():
@@ -261,11 +238,17 @@ def build_commander_pods(ordered_players, stats, is_finals_round=False):
     pod_number = 1
 
     while unassigned:
-        pod = [{"slot_number": 1, "name": unassigned.pop(0)}]
+        # Keep finals pod locked to the first four players in order.
+        if is_finals_round and pod_number == 1:
+            pod = []
+            while len(pod) < 4 and unassigned:
+                pod.append({"slot_number": len(pod) + 1, "name": unassigned.pop(0)})
+        else:
+            pod = [{"slot_number": 1, "name": unassigned.pop(0)}]
 
-        while len(pod) < 4 and unassigned:
-            selected_name = select_next_player(unassigned, pod, stats)
-            pod.append({"slot_number": len(pod) + 1, "name": selected_name})
+            while len(pod) < 4 and unassigned:
+                selected_name = select_next_player(unassigned, pod, stats)
+                pod.append({"slot_number": len(pod) + 1, "name": selected_name})
 
         while len(pod) < 4:
             pod.append({"slot_number": len(pod) + 1, "name": "BYE"})
@@ -340,8 +323,6 @@ def evaluate_round(round_number, pods, score_map, stats, apply_results):
         round_complete = round_complete and pod_complete
 
         result_text = "Pending scores"
-        tie = False
-        winners = []
 
         if apply_results and pod_complete:
             participant_names = [player["name"] for player in participants]
@@ -351,36 +332,30 @@ def evaluate_round(round_number, pods, score_map, stats, apply_results):
                     if opponent_name != name:
                         stats[name]["opponents"].append(opponent_name)
 
-            # Sort participants by score (descending)
-            sorted_participants = sorted(participants, key=lambda p: p["score"], reverse=True)
+            # Sort participants by place (ascending: 1st is best)
+            sorted_participants = sorted(participants, key=lambda p: p["score"])
             
             # Allocate points and wins based on placement
             placement_points = [3, 2, 1, 0]  # 1st, 2nd, 3rd, 4th
+            placement_labels = ["1st", "2nd", "3rd", "4th"]
             result_lines = []
             
             for placement_idx, player in enumerate(sorted_participants):
                 if placement_idx < len(placement_points):
-                    player["points_earned"] = placement_points[placement_idx]
                     stats[player["name"]]["points"] += placement_points[placement_idx]
                     
                     if placement_idx == 0:  # 1st place gets a win
                         stats[player["name"]]["wins"] += 1
-                        result_lines.append(f"{player['name']} (1st: {player['score']})")
-                    elif placement_idx == 1:
-                        result_lines.append(f"{player['name']} (2nd: {player['score']})")
-                    elif placement_idx == 2:
-                        result_lines.append(f"{player['name']} (3rd: {player['score']})")
+                    
+                    result_lines.append(f"{placement_labels[placement_idx]}: {player['name']}")
             
-            result_text = " • ".join(result_lines)
-            winners = [sorted_participants[0]]  # 1st place player
+            result_text = ", ".join(result_lines)
 
         scored_pod = {
             "pod_number": pod["pod_number"],
             "players": scored_players,
             "complete": pod_complete,
             "result_text": result_text,
-            "tie": tie,
-            "winners": winners,
         }
         if pod.get("is_finals"):
             scored_pod["is_finals"] = True
@@ -398,6 +373,7 @@ def compute_tournament_view(tournament):
     stats = initialize_stats(player_names)
     rounds = []
     completed_rounds = 0
+    finals_pod_players = []
 
     for round_number in range(1, 5):
         if round_number == 1:
@@ -409,11 +385,17 @@ def compute_tournament_view(tournament):
             other_players = ranked[4:]
             # Finalists first so they form pod 1
             ordered_players = finalists + other_players
+            finals_pod_players = finalists[:]
         else:
             ordered_players = rank_players(stats, player_names)
 
         is_finals = (round_number == 4 and len(player_names) >= 4)
         pods = build_commander_pods(ordered_players, stats, is_finals_round=is_finals)
+
+        if round_number == 4:
+            finals_pod = next((pod for pod in pods if pod.get("is_finals")), None)
+            if finals_pod:
+                finals_pod_players = [player["name"] for player in finals_pod["players"] if player["name"] != "BYE"]
         
         score_map = tournament["round_scores"].get(round_number, {})
         scored_pods, round_complete = evaluate_round(round_number, pods, score_map, stats, True)
@@ -432,6 +414,11 @@ def compute_tournament_view(tournament):
         break
 
     final_order = rank_players(stats, player_names)
+    if completed_rounds == 4 and finals_pod_players:
+        finalists_in_order = [name for name in final_order if name in finals_pod_players]
+        non_finalists_in_order = [name for name in final_order if name not in finals_pod_players]
+        final_order = finalists_in_order + non_finalists_in_order
+
     standings = [
         {
             "rank": index,
@@ -451,7 +438,7 @@ def compute_tournament_view(tournament):
         "completed_rounds": completed_rounds,
         "standings": standings,
         "ready_for_finals": False,
-        "finalists": [],
+        "finalists": finals_pod_players,
         "finals": None,
         "champion_name": champion_name,
         "status": status,
@@ -469,10 +456,8 @@ def enrich_tournament(tournament, persist=True):
 
 @app.route('/', methods=['GET'])
 def index():
-    tournaments = list_active_tournaments()
     return render_template(
         'index.html',
-        tournaments=tournaments,
         tournament_name='',
         player_count=8,
         player_names_text='',
@@ -544,5 +529,5 @@ def about():
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=False)
 

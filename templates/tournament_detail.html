@@ -64,7 +64,12 @@
                         {% for row in tournament.standings %}
                             <tr>
                                 <td>{{ row.rank }}</td>
-                                <td>{{ row.name }}</td>
+                                <td>
+                                    <span>{{ row.name }}</span>
+                                    {% if tournament.status == 'complete' and row.name in tournament.finalists %}
+                                        <span class="finalist-badge">Finalist</span>
+                                    {% endif %}
+                                </td>
                                 <td>{{ row.wins }}</td>
                                 <td>{{ row.points }}</td>
                                 <td>{{ '%.3f'|format(row.opponent_match_win_pct) }}</td>
@@ -93,6 +98,7 @@
                             {% for pod in round.pods %}
                                 <article class="bracket-match pod-card {% if pod.is_finals %}finals-pod{% endif %}">
                                     <div class="match-head">{% if pod.is_finals %}FINALS{% else %}Pod {{ pod.pod_number }}{% endif %}</div>
+                                    <p class="pod-instruction">Enter placement only: 1 = first, 4 = last.</p>
                                     {% for player in pod.players %}
                                         <label class="pod-line">
                                             <span>{{ player.name }}</span>
@@ -103,15 +109,16 @@
                                                     type="number"
                                                     name="{{ player.field_name }}"
                                                     class="form-control"
-                                                    min="0"
+                                                    min="1"
+                                                    max="4"
                                                     step="1"
                                                     value="{{ player.raw_score }}"
-                                                    placeholder="Score"
+                                                    placeholder="Place"
                                                 >
                                             {% endif %}
                                         </label>
                                     {% endfor %}
-                                    <div class="match-foot {% if pod.tie %}warning-text{% endif %}">{{ pod.result_text }}</div>
+                                    <div class="match-foot">{{ pod.result_text }}</div>
                                 </article>
                             {% endfor %}
                         </div>
@@ -123,13 +130,14 @@
                         {% for pod in round.pods %}
                             <article class="bracket-match pod-card {% if pod.is_finals %}finals-pod{% endif %}">
                                 <div class="match-head">{% if pod.is_finals %}FINALS{% else %}Pod {{ pod.pod_number }}{% endif %}</div>
+                                <p class="pod-instruction">Enter placement only: 1 = first, 4 = last.</p>
                                 {% for player in pod.players %}
                                     <div class="match-row">
                                         <span>{{ player.name }}</span>
                                         <strong>{% if player.raw_score != '' %}{{ player.raw_score }}{% else %}-{% endif %}</strong>
                                     </div>
                                 {% endfor %}
-                                <div class="match-foot {% if pod.tie %}warning-text{% endif %}">{{ pod.result_text }}</div>
+                                <div class="match-foot">{{ pod.result_text }}</div>
                             </article>
                         {% endfor %}
                     </div>

@@ -6,31 +6,69 @@
 <div class="row justify-content-center">
     <div class="col-md-8">
         <section class="mb-4">
-            <h1>How the commander pod creator works</h1>
-            <p class="lead">Use the home page to enter a tournament name, choose the player count, and paste player names one per line. The app builds four-player pods across 4 rounds and makes the finals cut obvious from the standings.</p>
+            <h1>Running a Commander Tournament</h1>
+            <p class="lead">This guide covers using {{ site_name }} to manage a 4-round Swiss commander tournament with 45-minute round windows.</p>
         </section>
 
         <section class="mb-3 sr-card">
-            <h3>Pod creation</h3>
-            <p>The player count controls the number of seats. Every pod is four players wide, and any empty seats are filled with BYEs automatically.</p>
+            <h3>Before the tournament</h3>
+            <ol style="padding-left: 20px; line-height: 1.8;">
+                <li><strong>Gather player names</strong> — Get a list of all participating players</li>
+                <li><strong>Create a tournament</strong> — Go to the home page, enter tournament name, player count, and names</li>
+                <li><strong>The app builds pods</strong> — Round 1 is randomized; rounds 2-4 seed by wins and opponent strength</li>
+                <li><strong>Print or reference pod assignments</strong> — Round 1 is locked in, but rounds 2-4 will update after scoring</li>
+            </ol>
         </section>
 
         <section class="mb-3 sr-card">
-            <h3>Scoring</h3>
-            <p>After generating pods, enter a score for each player and calculate advancement. The highest score in each pod moves on to the next round preview.</p>
+            <h3>Running each round (45 minutes)</h3>
+            <ul style="padding-left: 20px; line-height: 1.8;">
+                <li><strong>Announce pods</strong> — Call out which players are in each pod (1-4 players per pod)</li>
+                <li><strong>Start the clock</strong> — Players have 45 minutes to play their game</li>
+                <li><strong>Record final positions</strong> — After time, note each player's final score or position (highest to lowest)</li>
+                <li><strong>Enter into app</strong> — Click the tournament in History, go to current round, enter each player's score</li>
+                <li><strong>Save scores</strong> — Click "Save round scores" to calculate advancement</li>
+            </ul>
         </section>
 
         <section class="mb-3 sr-card">
-            <h3>Next useful additions</h3>
-            <ul>
-                <li>Persist saved pods and scores in SQLite.</li>
-                <li>Add tie-breaking rules for tied scores.</li>
-                <li>Support multiple scoring rounds automatically.</li>
+            <h3>The 4-round format</h3>
+            <p><strong>Round 1 (Random):</strong> Players are randomized into 4-player pods.</p>
+            <p><strong>Rounds 2-3 (Swiss seeding):</strong> Players ranked by wins → opponent strength → points. Top players are paired first.</p>
+            <p><strong>Round 4 (Finals):</strong> The top 4 players automatically play in Pod 1 (clearly labeled "FINALS"). Everyone else also plays their own pods.</p>
+        </section>
+
+        <section class="mb-3 sr-card">
+            <h3>Scoring system</h3>
+            <p>Each pod, players are ranked by final score (highest to lowest):</p>
+            <ul style="padding-left: 20px; line-height: 1.8;">
+                <li><strong>1st place:</strong> 3 points + 1 win recorded</li>
+                <li><strong>2nd place:</strong> 2 points</li>
+                <li><strong>3rd place:</strong> 1 point</li>
+                <li><strong>4th place:</strong> 0 points</li>
+            </ul>
+            <p><em>Note: Wins are the primary ranking metric. Points and opponent strength are tiebreakers.</em></p>
+        </section>
+
+        <section class="mb-3 sr-card">
+            <h3>After round 4</h3>
+            <p>Once all 4 rounds are scored, the tournament is marked complete. The player with the most wins (and best tiebreakers) is crowned champion. A confetti effect celebrates on the detail page!</p>
+            <p>All tournaments are saved permanently in the History section.</p>
+        </section>
+
+        <section class="mb-3 sr-card">
+            <h3>Tips for running smooth rounds</h3>
+            <ul style="padding-left: 20px; line-height: 1.8;">
+                <li>Announce round and time limit clearly before starting</li>
+                <li>Use a timer or have someone track the 45 minutes</li>
+                <li>Be ready to record scores quickly after each round ends</li>
+                <li>Check the app after round 4 to see the finals pod clearly marked</li>
+                <li>Use History to review completed tournaments anytime</li>
             </ul>
         </section>
 
         <div class="text-center mt-4">
-            <a href="/" class="sr-cta btn">Back to bracket creator</a>
+            <a href="/" class="sr-cta btn">Back to home</a>
         </div>
     </div>
 </div>

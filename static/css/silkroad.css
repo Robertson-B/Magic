@@ -40,6 +40,13 @@ body{font-family:Georgia,'Times New Roman',serif;background:
 .form-panel textarea{border-radius:16px;border:1px solid rgba(0,0,0,0.12);padding:.85rem 1rem;background:rgba(255,255,255,0.92)}
 .form-panel textarea{resize:vertical;}
 .create-tournament-container{max-width:560px;margin:0 auto;padding:24px 0;}
+
+.info-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:24px;max-width:1000px;margin-left:auto;margin-right:auto;}
+.info-card{padding:24px;}
+.info-card h3{font-size:1.2rem;margin:0 0 16px 0;color:var(--sr-primary);}
+.info-list{list-style:none;padding:0;margin:0;display:grid;gap:10px;}
+.info-list li{font-size:.95rem;line-height:1.5;color:var(--sr-text);}
+.info-list strong{color:var(--sr-primary);font-weight:700;}
 .bracket-panel{overflow:hidden;}
 .bracket-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;}
 .bracket-round{display:grid;gap:12px;align-content:start}
@@ -66,6 +73,7 @@ body{font-family:Georgia,'Times New Roman',serif;background:
 .standings-table-wrap{overflow:auto;border:1px solid rgba(0,0,0,0.08);border-radius:14px;}
 .standings-table{margin:0;background:rgba(255,255,255,0.82);}
 .standings-table th{font-size:.8rem;text-transform:uppercase;letter-spacing:.08em;color:var(--sr-muted);}
+.finalist-badge{display:inline-flex;align-items:center;margin-left:8px;padding:2px 8px;border-radius:999px;background:rgba(210,154,58,.2);border:1px solid rgba(210,154,58,.45);color:#815315;font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;font-weight:700;}
 
 .finals-panel{border-top:1px solid rgba(0,0,0,0.08);padding-top:14px;}
 .champion-banner{padding:12px 14px;border-radius:14px;background:linear-gradient(135deg, rgba(210,154,58,.28), rgba(140,63,44,.2));font-weight:700;color:var(--sr-text);}
