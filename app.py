@@ -1,4 +1,5 @@
 import csv
+from collections import Counter
 from datetime import datetime, timezone
 import json
 import io
@@ -484,6 +485,21 @@ def build_round_summary(round_data):
     return summary_rows
 
 
+def apply_submitted_scores_to_round(round_data, round_scores):
+    if not round_data:
+        return
+
+    for pod in round_data["pods"]:
+        pod_scores = round_scores.get(pod["pod_number"], {})
+        for player in pod["players"]:
+            if player["name"] == "BYE":
+                continue
+            score_entry = pod_scores.get(player["slot_number"], {})
+            if score_entry:
+                player["raw_score"] = score_entry.get("raw_score", "")
+                player["score"] = score_entry.get("score")
+
+
 def export_tournament_csv_data(tournament):
     output = io.StringIO()
     writer = csv.writer(output)
@@ -522,6 +538,31 @@ def export_tournament_csv_data(tournament):
             )
 
     return output.getvalue()
+
+
+def build_tiebreak_detail(player_name, stats):
+    player_stats = stats[player_name]
+    rounds_played = player_stats["rounds_played"]
+    pod_win_pct = player_stats["wins"] / rounds_played if rounds_played else 0.0
+
+    opponent_counts = Counter(player_stats["opponents"])
+    opponents = []
+    for opponent_name, meetings in sorted(opponent_counts.items(), key=lambda item: item[0].lower()):
+        opponent_rounds = stats[opponent_name]["rounds_played"]
+        opponent_pod_win_pct = stats[opponent_name]["wins"] / opponent_rounds if opponent_rounds else 0.0
+        opponents.append(
+            {
+                "name": opponent_name,
+                "meetings": meetings,
+                "pod_win_pct": opponent_pod_win_pct,
+            }
+        )
+
+    return {
+        "rounds_played": rounds_played,
+        "pod_win_pct": pod_win_pct,
+        "opponents": opponents,
+    }
 
 
 def evaluate_round(round_number, pods, score_map, stats, apply_results):
@@ -656,6 +697,7 @@ def compute_tournament_view(tournament):
             "wins": stats[name]["wins"],
             "points": stats[name]["points"],
             "opponent_match_win_pct": stats[name]["opponent_match_win_pct"],
+            "tiebreak_detail": build_tiebreak_detail(name, stats),
         }
         for index, name in enumerate(final_order, start=1)
     ]
@@ -729,11 +771,21 @@ def tournament_detail(tournament_id):
                     previous_round_scores = tournament['round_scores'].get(round_number, {})
                     tournament['round_scores'][round_number] = round_scores
                     append_edit_history(tournament, round_number, previous_round_scores, round_scores)
+            else:
+                validation_errors = ["Could not find that round to save. Refresh and try again."]
 
         if validation_errors:
             tournament = enrich_tournament(tournament, persist=False)
             current_round = tournament['current_round']
             active_round = tournament['rounds'][current_round - 1] if current_round <= len(tournament['rounds']) else None
+            if action == 'save_round':
+                failed_round_number = int(request.form.get('round_number', '1'))
+                failed_round = tournament['rounds'][failed_round_number - 1] if failed_round_number <= len(tournament['rounds']) else None
+                if failed_round and target_round:
+                    submitted_round_scores = build_round_score_map(request.form, failed_round_number, target_round['pods'])
+                    apply_submitted_scores_to_round(failed_round, submitted_round_scores)
+                    current_round = failed_round_number
+                    active_round = failed_round
             round_summary = build_round_summary(active_round)
             return render_template(
                 'tournament_detail.html',

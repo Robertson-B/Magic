@@ -106,6 +106,24 @@
                                     {% if tournament.status == 'complete' and row.name in tournament.finalists %}
                                         <span class="finalist-badge">Finalist</span>
                                     {% endif %}
+                                    <details class="tiebreak-details">
+                                        <summary>Tiebreak details</summary>
+                                        <ul>
+                                            <li>Pod win %%: {{ '%.3f'|format(row.tiebreak_detail.pod_win_pct) }}</li>
+                                            <li>Rounds played: {{ row.tiebreak_detail.rounds_played }}</li>
+                                            <li>Opp MW%%: {{ '%.3f'|format(row.opponent_match_win_pct) }}</li>
+                                            <li>
+                                                Opponents:
+                                                {% if row.tiebreak_detail.opponents %}
+                                                    {% for opponent in row.tiebreak_detail.opponents %}
+                                                        <span class="opp-chip">{{ opponent.name }} x{{ opponent.meetings }} ({{ '%.3f'|format(opponent.pod_win_pct) }})</span>
+                                                    {% endfor %}
+                                                {% else %}
+                                                    none yet
+                                                {% endif %}
+                                            </li>
+                                        </ul>
+                                    </details>
                                 </td>
                                 <td>{{ row.wins }}</td>
                                 <td>{{ row.points }}</td>
@@ -220,31 +238,29 @@
 <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
 <script>
 {% if tournament.status == 'complete' %}
-    document.addEventListener('DOMContentLoaded', function() {
-        // Trigger confetti after a brief delay for visual effect
+    // Trigger confetti after a brief delay for visual effect
+    setTimeout(function() {
+        confetti({
+            particleCount: 100,
+            spread: 70,
+            origin: { y: 0.6 }
+        });
+        // Second burst
         setTimeout(function() {
             confetti({
-                particleCount: 100,
-                spread: 70,
-                origin: { y: 0.6 }
+                particleCount: 50,
+                angle: 60,
+                spread: 55,
+                origin: { x: 0, y: 0.6 }
             });
-            // Second burst
-            setTimeout(function() {
-                confetti({
-                    particleCount: 50,
-                    angle: 60,
-                    spread: 55,
-                    origin: { x: 0, y: 0.6 }
-                });
-                confetti({
-                    particleCount: 50,
-                    angle: 120,
-                    spread: 55,
-                    origin: { x: 1, y: 0.6 }
-                });
-            }, 250);
-        }, 400);
-    });
+            confetti({
+                particleCount: 50,
+                angle: 120,
+                spread: 55,
+                origin: { x: 1, y: 0.6 }
+            });
+        }, 250);
+    }, 400);
 {% endif %}
 </script>
 {% endblock %}
