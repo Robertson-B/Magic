@@ -3,7 +3,7 @@ import os
 from random import shuffle
 import sqlite3
 
-from flask import Flask, abort, redirect, render_template, request, url_for
+from flask import Flask, abort, make_response, redirect, render_template, request, url_for
 
 app = Flask(__name__)
 DB_PATH = os.path.join(os.path.dirname(__file__), "magic_brackets.db")
@@ -12,6 +12,86 @@ DB_PATH = os.path.join(os.path.dirname(__file__), "magic_brackets.db")
 @app.context_processor
 def inject_site_name():
     return {"site_name": "MTG Bracket Forge"}
+
+
+@app.route('/manifest.webmanifest')
+def manifest():
+        manifest_data = {
+                "name": "MTG Bracket Forge",
+                "short_name": "Bracket Forge",
+                "start_url": "/",
+                "scope": "/",
+                "display": "standalone",
+                "background_color": "#f5efe7",
+                "theme_color": "#8c3f2c",
+                "description": "Commander tournament brackets, standings, and finals tracking.",
+                "icons": [
+                        {
+                                "src": "/static/icons/icon.svg",
+                                "sizes": "any",
+                                "type": "image/svg+xml",
+                                "purpose": "any maskable",
+                        }
+                ],
+        }
+        response = make_response(json.dumps(manifest_data))
+        response.headers["Content-Type"] = "application/manifest+json"
+        return response
+
+
+@app.route('/sw.js')
+def service_worker():
+        service_worker_js = """
+const CACHE_NAME = 'mtg-bracket-forge-v1';
+const CORE_ASSETS = [
+    '/',
+    '/about',
+    '/tournaments/history',
+    '/manifest.webmanifest',
+    '/static/css/silkroad.css',
+    '/static/icons/icon.svg'
+];
+
+self.addEventListener('install', event => {
+    event.waitUntil(
+        caches.open(CACHE_NAME).then(cache => cache.addAll(CORE_ASSETS))
+    );
+    self.skipWaiting();
+});
+
+self.addEventListener('activate', event => {
+    event.waitUntil(
+        caches.keys().then(keys => Promise.all(
+            keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
+        ))
+    );
+    self.clients.claim();
+});
+
+self.addEventListener('fetch', event => {
+    if (event.request.method !== 'GET') {
+        return;
+    }
+
+    event.respondWith(
+        caches.match(event.request).then(cachedResponse => {
+            if (cachedResponse) {
+                return cachedResponse;
+            }
+
+            return fetch(event.request).then(networkResponse => {
+                const responseClone = networkResponse.clone();
+                caches.open(CACHE_NAME).then(cache => cache.put(event.request, responseClone));
+                return networkResponse;
+            }).catch(() => caches.match('/'));
+        })
+    );
+});
+"""
+        response = make_response(service_worker_js)
+        response.headers["Content-Type"] = "application/javascript"
+        response.headers["Cache-Control"] = "no-cache"
+        return response
 
 
 def get_db_connection():

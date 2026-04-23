@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="MTG Bracket Forge">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#8c3f2c"/>
+      <stop offset="100%" stop-color="#153f57"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <circle cx="256" cy="240" r="124" fill="rgba(255,255,255,0.08)"/>
+  <path d="M256 118l42 88 97 14-70 68 16 97-85-45-85 45 16-97-70-68 97-14z" fill="#d29a3a"/>
+  <rect x="214" y="300" width="84" height="118" rx="20" fill="#fffaf3" opacity="0.92"/>
+  <path d="M224 322h64v14h-64zm0 28h64v14h-64zm0 28h40v14h-40z" fill="#8c3f2c"/>
+</svg>
