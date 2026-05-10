@@ -359,8 +359,8 @@ def rank_players(stats, player_names):
         player_names,
         key=lambda name: (
             -stats[name]["wins"],
-            -stats[name]["opponent_match_win_pct"],
             -stats[name]["points"],
+            -stats[name]["opponent_match_win_pct"],
             name.lower(),
         ),
     )
